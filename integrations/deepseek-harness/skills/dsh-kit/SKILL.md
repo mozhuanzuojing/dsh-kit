@@ -1,17 +1,17 @@
 ---
 name: dsh-kit
-description: "dsh-kit bundle meta-skill: explains the capability boundaries and origins of this bundle's 92 skills (8 bundled in-house + 84 merged from upstream: ECC 59 / mattpocock 19 / claude-mem 6) and points to rules/ and references/. 说明本包 92 个技能的能力边界与来源（8 个包内自有 + 84 个上游合并：ECC 59 / mattpocock 19 / claude-mem 6），并指引 rules/ 与 references/。用户问\"dsh-kit 有什么\"\"插件能力\"\"包里有哪些技能\"时触发。"
+description: "dsh-kit bundle meta-skill: explains the capability boundaries and origins of this bundle's 95 skills (11 bundled in-house + 84 merged from upstream: ECC 59 / mattpocock 19 / claude-mem 6) and points to rules/ and references/. 说明本包 95 个技能的能力边界与来源（11 个包内自有 + 84 个上游合并：ECC 59 / mattpocock 19 / claude-mem 6），并指引 rules/ 与 references/。用户问\"dsh-kit 有什么\"\"插件能力\"\"包里有哪些技能\"时触发。"
 ---
 
 # dsh-kit bundle
 
-dsh-kit is a **DeepSeek Harness bundle-shaped** skill bundle shipping **92 skills**. Skills are loaded in isolation from the bundle (provider `dsh-kit`, `includeDefaultRoots: false`) and are never written into canonical skill directories such as `~/.agents/skills`.
+dsh-kit is a **DeepSeek Harness bundle-shaped** skill bundle shipping **95 skills**. Skills are loaded in isolation from the bundle (provider `dsh-kit`, `includeDefaultRoots: false`) and are never written into canonical skill directories such as `~/.agents/skills`.
 
 ## Where the skills come from
 
 | Origin | Count | License | Notes |
 |--------|-------|---------|-------|
-| Bundled in-house | **8** | MIT | `chrome-devtools-wsl`, `diagnose`, `dsh-kit`, `github-repo`, `grow-dream`, `karpathy-guidelines`, `write-a-skill`, `wsl-network` |
+| Bundled in-house | **9** | MIT | `chrome-devtools-wsl`, `diagnose`, `dsh-kit`, `github-repo`, `grow-dream`, `karpathy-guidelines`, `ssrf-remediation`, `write-a-skill`, `wsl-network` |
 | `affaan-m/ECC` | **59** | MIT | General engineering workflow + language ecosystems (Python/Go/Rust/Java/Kotlin/JS/Django/Laravel/Rails) + agent meta-skills |
 | `mattpocock/skills` | **19** | MIT | Review, specs, ticket splitting, triage, TDD, grilling-style design |
 | `thedotmack/claude-mem` | **6** | Apache-2.0 | Handoff docs, standup, PR babysitting, codebase onboarding, design audit |
@@ -27,7 +27,7 @@ The counts above are this bundle's headline numbers — **recompute, do not trus
 
 | Purpose | Skills |
 |---------|--------|
-| Verification and review | `code-review`, `verification-loop`, `santa-method`, `production-audit`, `security-review` |
+| Verification and review | `code-review`, `verification-loop`, `santa-method`, `production-audit`, `security-review`, `ssrf-remediation` |
 | Design and architecture | `codebase-design`, `architecture-decision-records`, `hexagonal-architecture`, `contract-first`, `api-design`, `domain-modeling` |
 | Requirements and triage | `to-spec`, `to-tickets`, `triage`, `intent-driven-development`, `grill-with-docs`, `grilling` |
 | Implementation and testing | `tdd`, `e2e-testing`, plus `python-testing`, `golang-testing`, `rust-testing`, `kotlin-testing`, `django-tdd`, `react-testing` |
@@ -35,7 +35,7 @@ The counts above are this bundle's headline numbers — **recompute, do not trus
 | Delivery and repos | `git-workflow`, `pr`, `deployment-patterns`, `database-migrations`, `setup-pre-commit` |
 | Environment and tooling | `chrome-devtools-wsl`, `wsl-network`, `docker-patterns`, `mcp-server-patterns`, `kubernetes-patterns` |
 
-The authoritative list of all 92 is the bundle's own `skills/` directory; each skill is triggered by its own `description`.
+The authoritative list of all 93 is the bundle's own `skills/` directory; each skill is triggered by its own `description`.
 
 ## Global rules
 
@@ -54,6 +54,7 @@ Rules and reference files distributed with the bundle live in `rules/` and `refe
 |------|------|---------|
 | `../../rules/` | `wsl-cli-tools.md` | WSL modern CLI toolchain mapping table |
 | `../../rules/` | `proxy-management.md` | Proxy management and DSH plugin-bundle operations guide |
+| `../../rules/` | `code-layout-and-comments.md` | Surface the core algorithm & spec first (numbered steps, readable without code); push boilerplate/helpers to the end |
 | `../../references/` | `grow-dream-types.md` | grow-dream candidate type definitions |
 | `../../references/` | `upstream-sources.md` | Upstream source registry index (citation keys / snapshots / licenses / usage scope) |
 | `../../references/` | `upstream-ecc.md` | ECC source fascicle (59 skills) |

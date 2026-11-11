@@ -1,6 +1,6 @@
 ---
 name: security-review
-description: "Use this skill when adding authentication, handling user input, working with secrets, creating API endpoints, or implementing payment/sensitive features. 安全评审清单：鉴权、用户输入、密钥处理、API 端点与支付等敏感功能实现前的检查项。"
+description: "Use this skill when adding authentication, handling user input, working with secrets, creating API endpoints, or implementing payment/sensitive features. Includes an SSRF / server-side URL-fetch checklist. 安全评审清单：鉴权、用户输入、密钥处理、API 端点、支付及 SSRF/服务端取源等敏感功能实现前的检查项（SSRF 详见 ssrf-remediation 技能）。"
 metadata:
   origin: ecc
   upstream: affaan-m/ECC
@@ -439,6 +439,22 @@ npm ci  # Instead of npm install
 - [ ] Dependabot enabled on GitHub
 - [ ] Regular security updates
 
+### 11. SSRF / Server-Side URL Fetch
+
+When any endpoint fetches a user-supplied URL (file preview, image proxy, webhook tester, "import from URL", URL→PDF):
+
+- Validate **at the sink on the exact parameter fetched** — a filter that checks `url` while the handler fetches `urlPath` is bypassable (param desync).
+- Parse the URL and match **host (+port) exactly** against an allowlist; never `startsWith`/`contains` on the raw string → `http://allowed@169.254.169.254` and `http://allowed.evil.com` escape it.
+- **Always** block loopback/link-local (`127/8, ::1, 169.254/16` cloud metadata, `fe80::/10`); with no allowlist also block private ranges. Re-validate every redirect hop, or disable redirects.
+
+#### Verification Steps
+- [ ] Target validated after URL parse, by exact host:port, on the fetched param
+- [ ] Loopback / link-local / cloud-metadata hard-blocked even if allowlisted
+- [ ] Redirects re-validated per hop (or disabled)
+- [ ] PoC (`@`, domain-suffix, metadata IP) asserted REJECT in a test
+
+> Full playbook + Java reference: bundled skill **`ssrf-remediation`**.
+
 ## Security Testing
 
 ### Automated Security Tests
@@ -507,6 +523,7 @@ Before ANY production deployment:
 - [Next.js Security](https://nextjs.org/docs/security)
 - [Supabase Security](https://supabase.com/docs/guides/auth)
 - [Web Security Academy](https://portswigger.net/web-security)
+- SSRF playbook: see the bundled `ssrf-remediation` skill
 
 ---
 

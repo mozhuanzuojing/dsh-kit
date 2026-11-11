@@ -7,7 +7,7 @@
  *   现按新政策收口；⑥ 是本轮**新增**的正文语言门。
  *
  * 校验项（除 ⑩ / ⑪ 两项读数外全部计入退出码）：
- *  1) 技能数 = 92，每个技能目录都有 SKILL.md
+ *  1) 技能数 = 95，每个技能目录都有 SKILL.md
  *  2) 只有 skills/<name>/SKILL.md 一层会被 DSH 发现；嵌套 SKILL.md 只允许 grow-dream 的模板载荷，数量与路径必须与预期一致
  *  3) frontmatter 无致命 legacy 键（disableModelInvocation / modelInvocable / userInvocable）
  *  4) name/description 必填，且 name 与目录名一致
@@ -39,7 +39,7 @@ import { fileURLToPath } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SKILLS = join(HERE, "..", "integrations", "deepseek-harness", "skills");
-const EXPECTED = 92;
+const EXPECTED = 95;
 
 const ALLOWED = new Set(["name", "description", "whenToUse", "metadata", "disable-model-invocation", "user-invocable"]);
 const LEGACY = new Set(["disableModelInvocation", "modelInvocable", "userInvocable"]);
@@ -47,8 +47,8 @@ const LEGACY = new Set(["disableModelInvocation", "modelInvocable", "userInvocab
 /** CONTEXT D8：本包的 8 个用户调用型技能（上游 mattpocock/skills 成文策略）。 */
 const USER_INVOKED = ["grill-me", "grill-with-docs", "handoff", "improve-codebase-architecture", "retro", "triage", "to-spec", "to-tickets"];
 
-/** 8 个包内自有技能：无上游来源，metadata 允许只有 origin: dsh-kit。 */
-const NATIVE = ["chrome-devtools-wsl", "diagnose", "dsh-kit", "github-repo", "grow-dream", "karpathy-guidelines", "write-a-skill", "wsl-network"];
+/** Native (in-house) skills: no upstream source; metadata may be only origin: dsh-kit. */
+const NATIVE = ["chrome-devtools-wsl", "diagnose", "dsh-kit", "github-repo", "grow-dream", "karpathy-guidelines", "naming", "write-a-skill", "wsl-network"];
 
 /** 上游 metadata 三元组，与 references/upstream-sources.md 的引用总表一一对应。 */
 const ORIGINS = new Map<string, [upstream: string, snapshot: string]>([
@@ -201,7 +201,7 @@ function isPackageRelativeTarget(target: string): boolean {
 }
 
 /**
- * **frontmatter 单行标量的语法检查**（修复轮新增；本包 92 个技能全部用 `key: "…"` 这一档）。
+ * **frontmatter 单行标量的语法检查**（修复轮新增；本包 95 个技能全部用 `key: "…"` 这一档）。
  * 纯正则抽取无法发现「引号没配对 / 内部裸 `"` / 非法转义」—— 而 frontmatter 坏掉会让 DSH **静默丢弃**该技能
  * （CONTEXT「DSH 认可键」记过 legacy 键的 fail-silent）。返回 `undefined` = 没问题。
  */
