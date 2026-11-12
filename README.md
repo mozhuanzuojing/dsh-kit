@@ -5,7 +5,7 @@ DeepSeek Harness **bundle 形式**的技能包：**95 个技能**（11 个包内
 | 项 | 值 |
 |---|---|
 | 包位置 | `integrations/deepseek-harness/`（包名 **`dsh-kit`**） |
-| 版本 | **6.2.0** |
+| 版本 | **6.2.1** |
 | 技能 | **95** = 11 个包内自有 + 84 个上游合并（`affaan-m/ECC` 59 / `mattpocock/skills` 19 / `thedotmack/claude-mem` 6 / `alibaba/open-code-review` 0） |
 | 随包参考 | `rules/`（WSL CLI 工具链、代理管理）、`references/`（grow-dream 类型定义 + 上游来源登记） |
 | 上游来源登记 | `references/upstream-sources.md` 与四份分册（论文引用格式：作者/载体/快照 SHA/许可/URL/取用范围/**引用键**） |
@@ -32,6 +32,19 @@ dsh plugin --profile <profile> list --depth 0
 ```powershell
 dsh plugin --profile <profile> remove dsh-kit
 ```
+
+## v6.2.1 变更（ast-grep CLI 引擎"假绿"修复）
+
+**问题**：`check-code-names.py` 的 CLI 引擎调用 `ast-grep run --kind <KIND>`，而 `run` 子命令只有 `--pattern`——对上表所有 kind 都返回 `error: unexpected argument '--kind'`，旧代码对每个非 0 返回 `continue`，于是**全部 kind 失败 → 抽取结果为空 → findings=0**，输出"未发现明显命名问题"。这是"代码命名全合格"的**假绿**，不是真实结论。
+
+**修复**：改用官方受支持的 `scan --stdin --inline-rules`（`--inline-rules` 自 ast-grep 0.15.1 起可用）：
+- 该语言全部 kind 编成一个规则文档，**每文件 1 次子进程**（原为文件 × kind 次）；
+- 非 0 退出码**不再吞掉**：先逐条探测、剪掉该版本不认的 kind 并告警，全废则抛错 → 显式降级正则；
+- 0 匹配与规则损坏区分开（后者必然非 0）；
+- 顺带修掉真实语料暴露的两个取名缺陷：`@Transactional(...)` 被误取名为 `Transactional`、函数体注释 `// ... method stub` 被误取名为 `stub`（真实方法 `doInsert` 漏检），并按名字实际位置回算真实行号；
+- **逐 finding 标注实际生效引擎**（降级文件写 `regex`，不全沿用全局引擎名），仓库级聚合 findings 亦补齐 `engine`，并新增 `degraded_files` 读数。
+
+**回归**：新增 11 条用例（含"坏名样例各引擎必须报出问题"的反假绿自检），`run-all-tests.py` 共 **74** 条，Windows/WSL 双平台全绿；另用 424 个真实 Java 文件对照 CLI 与正则两引擎（CLI 1355 条 / 正则 1159 条，差异逐条核实为 AST 更准）。
 
 ## v6.2.0 变更（naming 技能深度化 + 校验门转绿）
 

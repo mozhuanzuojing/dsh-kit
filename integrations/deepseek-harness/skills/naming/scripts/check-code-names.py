@@ -299,52 +299,206 @@ def extract_decls_ast(ag, text, lang):
     return out
 
 
-def extract_decls_cli(text, lang, path):
-    """ast-grep CLI 兜底：`sg run --pattern` 逐类抽取（子进程）。"""
+# ---------------------------------------------------------------- ast-grep CLI 引擎
+#
+# 历史 bug（已修）：旧实现调用 `sg run --kind <KIND> --lang <L>`。`run` 子命令从来只有
+# `--pattern`，对上面所有 kind 都返回 `error: unexpected argument '--kind'`，
+# 而旧代码对每个非 0 返回直接 `continue`，于是**所有 kind 全部失败 → out 为空 → findings=0**，
+# 表现为“代码命名全合格”的假绿。
+#
+# 现在的做法（对应 ast-grep 官方 CLI 语义，`scan --inline-rules` 自 0.15.1 起可用）：
+#   · 用 `scan --inline-rules` 一次提交该语言的**全部 kind 规则**（JSON 文档，`---` 分隔），
+#     子进程数从「文件 × kind」降到「文件」，规则语法错误会以非 0 退出码暴露；
+#   · 非 0 退出码**不再 continue**：先逐条重建（剔除该版本不认的 kind 并打印），
+#     仍失败则抛异常 → 调用方显式降级为正则并告警；
+#   · 0 匹配是合法结果（文件里真的没有该 kind），与“规则坏了”区分开——后者必然非 0。
+
+# (lang, exe) → (可用的 specs, rule_id → decl_kind)，避免每个文件重复探测
+_CLI_PLAN_CACHE = {}
+
+
+def _cli_exe():
     import shutil
+    return shutil.which("ast-grep") or shutil.which("sg")
+
+
+def _cli_scan(exe, rules_doc, text):
+    """跑一次 scan；text 走 --stdin，避免路径/忽略规则干扰。"""
     import subprocess
-    exe = shutil.which("ast-grep") or shutil.which("sg")
+    return subprocess.run([exe, "scan", "--stdin", "--json=stream", "--inline-rules", rules_doc],
+                          input=text, capture_output=True, text=True,
+                          encoding="utf-8", errors="replace", timeout=120)
+
+
+def _cli_doc(lang_name, specs):
+    """把 [(kind, decl_kind)] 编成 --inline-rules 文档；返回 (doc, {rule_id: decl_kind})。"""
+    rules, id_map = [], {}
+    for i, (node_kind, decl_kind) in enumerate(specs):
+        rid = f"{node_kind}_{i}"
+        id_map[rid] = decl_kind
+        rules.append({"id": rid, "language": lang_name, "rule": {"kind": node_kind}})
+    return "\n---\n".join(json.dumps(r, ensure_ascii=False) for r in rules), id_map
+
+
+def _cli_plan(exe, lang, lang_name):
+    """探测该 CLI 版本接受的 kind 集合（只在整体解析失败时逐条探测一次，结果缓存）。"""
+    key = (lang, exe)
+    if key in _CLI_PLAN_CACHE:
+        return _CLI_PLAN_CACHE[key]
+    specs = AST_DECL_SPECS.get(lang, [])
+    doc, id_map = _cli_doc(lang_name, specs)
+    probe = _cli_scan(exe, doc, "\n")
+    if probe.returncode == 0:
+        _CLI_PLAN_CACHE[key] = (specs, id_map)
+        return _CLI_PLAN_CACHE[key]
+    # 整体失败（典型原因：该版本删改了某个 kind）→ 逐条探测，保留能用的
+    accepted = []
+    for spec in specs:
+        one_doc, _ = _cli_doc(lang_name, [spec])
+        if _cli_scan(exe, one_doc, "\n").returncode == 0:
+            accepted.append(spec)
+        else:
+            _warn(f"ast-grep CLI 不接受 kind={spec[0]}（{lang}）；该语言将漏检这一类声明")
+    if not accepted:
+        raise RuntimeError(
+            f"ast-grep CLI 拒绝该语言的全部 kind 规则（{lang}）："
+            f"{(probe.stderr or '').strip().splitlines()[:1]}")
+    doc, id_map = _cli_doc(lang_name, accepted)
+    _CLI_PLAN_CACHE[key] = (accepted, id_map)
+    return _CLI_PLAN_CACHE[key]
+
+
+# 名字在片段里的位置：先认关键字前缀，再认「标识符后紧跟 ( : =」，最后认首个标识符
+_NAME_KEYWORD_RE = re.compile(
+    r"\b(?:function|class|interface|type|struct|enum|trait|def|fn|func|method|object|module|"
+    r"const|var|val|let)\s+([A-Za-z_$][\w$]*)")
+_NAME_CALLABLE_RE = re.compile(r"([A-Za-z_$][\w$]*)\s*[(:=]")
+_IDENT_RE = re.compile(r"[A-Za-z_$][\w$]*")
+# 兜底取首个标识符时要跳过的语言关键字（否则 java 的 `void m()` 会取到 void）
+_SNIPPET_KEYWORDS = {"public", "private", "protected", "static", "final", "abstract", "readonly",
+                     "class", "interface", "enum", "struct", "trait", "fn", "func", "def",
+                     "function", "const", "let", "var", "val", "object", "module", "void",
+                     "int", "long", "short", "byte", "char", "boolean", "float", "double",
+                     "string", "bool", "async", "export", "default", "declare", "type", "new",
+                     "this", "self", "mut", "pub", "unsafe", "extern"}
+# JSX/TSX：函数体里出现 JSX 标签才算组件（与 ast-grep-py 分支的 _returns_jsx 对齐）
+_JSX_LIKE_RE = re.compile(r"<[A-Za-z][\w.]*(?:\s[^<>]*)?/?>")
+
+
+# 注解/注释会混进匹配片段里（ast-grep 的 method_declaration/class_declaration 范围含注解与函数体），
+# 必须先遮蔽掉，否则：
+#   · `@Transactional(rollbackFor = ...)` 会被当成「标识符后跟 (」→ 误取名为 Transactional；
+#   · 函数体注释 `// TODO Auto-generated method stub` 里的 "method stub" 会被关键字规则命中 → 误取名 stub。
+_ANNOTATION_RE = re.compile(r"@[A-Za-z_$][\w$]*(?:\s*\.\s*[A-Za-z_$][\w$]*)*"
+                            r"(?:\s*\((?:[^()]|\([^()]*\))*\))?")
+# 只认「行首（允许缩进）的 //」和块注释：避免把字符串里的 `"http://..."` 当成注释吃掉半行
+_COMMENT_RE = re.compile(r"(?m)^[^\S\n]*//[^\n]*|/\*.*?\*/", re.S)
+
+
+def _mask(snippet):
+    """把注解与注释替换成等长空白（保留换行），剥离后下标仍对应原文。"""
+    def _blank(m):
+        return "".join(ch if ch == "\n" else " " for ch in m.group(0))
+
+    snippet = _COMMENT_RE.sub(_blank, snippet)
+    prev = None
+    while prev != snippet:            # 注解可连续出现，剥到稳定
+        prev = snippet
+        snippet = _ANNOTATION_RE.sub(_blank, snippet)
+    return snippet
+
+
+# 按声明类别选「名字写在哪」的规则：类看关键字前缀，函数看名字后的 `(`，变量看 `=`/`:`。
+_KIND_KEYWORD = {
+    "class": r"(?:class|interface|enum|struct|trait|object|module|type|record|union)\s+",
+    "function": r"(?:function|def|fn|func|method|sub)\s+",
+    "variable": r"(?:const|let|var|val|final|static)\s+",
+}
+_VAR_ASSIGN_RE = re.compile(r"([A-Za-z_$][\w$]*)\s*(?::[^=;]*)?=(?!=)")
+
+
+def _name_span(snippet, decl_kind=None):
+    """返回 (name, start_index) —— 名字在**原始片段**中的位置，用于算真实行号。"""
+    masked = _mask(snippet)
+    if decl_kind in _KIND_KEYWORD:
+        m = re.search(_KIND_KEYWORD[decl_kind] + r"([A-Za-z_$][\w$]*)", masked)
+        if m:
+            return m.group(1), m.start(1)
+    if decl_kind == "variable":
+        # 变量先看 `a = ...` / `a: T = ...`，再看关键字前缀
+        m = _VAR_ASSIGN_RE.search(masked)
+        if m and m.group(1) not in _SNIPPET_KEYWORDS:
+            return m.group(1), m.start(1)
+    if decl_kind in ("function", "component"):
+        m = _NAME_CALLABLE_RE.search(masked)
+        if m and m.group(1) not in _SNIPPET_KEYWORDS:
+            return m.group(1), m.start(1)
+    for pat in (_NAME_KEYWORD_RE, _NAME_CALLABLE_RE):
+        m = pat.search(masked)
+        if m:
+            word = m.group(1)
+            if word not in _SNIPPET_KEYWORDS:
+                return word, m.start(1)
+    for m in _IDENT_RE.finditer(masked):
+        word = m.group(0)
+        if word not in _SNIPPET_KEYWORDS:
+            return word, m.start(0)
+    return None, None
+
+
+def extract_decls_cli(text, lang, path):
+    """ast-grep CLI 抽取：每文件一次 scan，按 kind 规则拿声明。
+
+    返回 [(line, name, kind, scope)]；规则层失败必须抛异常（由调用方降级正则并告警），
+    绝不把“抽取不到”当“没问题”。
+    """
+    exe = _cli_exe()
     if not exe:
         raise RuntimeError("未找到 ast-grep CLI")
     lang_name = AST_LANG_NAME.get(lang)
     if not lang_name:
         raise RuntimeError(f"ast-grep CLI 不支持语言 {lang}")
-    out = []
-    seen = set()
-    for node_kind, decl_kind in AST_DECL_SPECS.get(lang, []):
-        proc = subprocess.run([exe, "run", "--kind", node_kind, "--lang", lang_name,
-                               "--json=stream", path],
-                              capture_output=True, text=True, encoding="utf-8", timeout=60)
-        if proc.returncode != 0:
-            continue
-        for line in proc.stdout.splitlines():
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                item = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            start = item.get("range", {}).get("start", {})
-            ln = int(start.get("line", 0)) + 1
-            snippet = item.get("text", "")
-            m = re.search(r"\b(?:function|class|interface|type|struct|enum|trait|def|fn|func|method)\s+"
-                          r"([A-Za-z_$][\w$]*)", snippet)
-            nm = m.group(1) if m else None
-            if not nm:
-                m2 = re.search(r"([A-Za-z_$][\w$]*)\s*[(:=]", snippet)
-                nm = m2.group(1) if m2 else None
-            if not nm:
-                continue
-            key = (ln, nm, decl_kind)
-            if key in seen:
-                continue
-            seen.add(key)
-            out.append((ln, nm, decl_kind, ""))
-    if not out and not AST_DECL_SPECS.get(lang):
-        raise RuntimeError("无 AST 声明规格")
-    return out
+    specs = AST_DECL_SPECS.get(lang, [])
+    if not specs:
+        raise RuntimeError(f"无 AST 声明规格: {lang}")
 
+    specs, id_map = _cli_plan(exe, lang, lang_name)
+    doc, _ = _cli_doc(lang_name, specs)
+    proc = _cli_scan(exe, doc, text)
+    if proc.returncode != 0:
+        detail = (proc.stderr or "").strip().splitlines()
+        raise RuntimeError(f"ast-grep CLI 规则执行失败 rc={proc.returncode}："
+                           f"{detail[0] if detail else '无 stderr'}")
+
+    out, seen = [], set()
+    for raw in proc.stdout.splitlines():
+        raw = raw.strip()
+        if not raw:
+            continue
+        try:
+            item = json.loads(raw)
+        except json.JSONDecodeError:
+            _warn("ast-grep CLI 输出含非 JSON 行，已跳过（输出契约变化？）")
+            continue
+        decl_kind = id_map.get(item.get("ruleId"))
+        if decl_kind is None:
+            continue
+        snippet = item.get("text", "")
+        nm, offset = _name_span(snippet, decl_kind)
+        if not nm:
+            continue
+        start = item.get("range", {}).get("start", {})
+        base_line = int(start.get("line", 0))
+        # 名称在片段里的偏移折算回真实行号：声明带注解时片段起点在注解行，名字可能在后面
+        ln = base_line + snippet[:offset or 0].count("\n") + 1
+        if lang in ("tsx", "jsx") and decl_kind == "function" and _JSX_LIKE_RE.search(snippet):
+            decl_kind = "component"
+        key = (ln, nm, decl_kind)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append((ln, nm, decl_kind, ""))
+    return out
 
 # ---------------------------------------------------------------- 正则兜底引擎
 
@@ -698,7 +852,9 @@ def main():
     records = []
     files_scanned = 0
     unsupported = 0
+    degraded_files = 0
     scanned_paths = []
+    file_engines = {}
 
     for path, lang in iter_files(args.path, args.lang, args.max_files):
         if lang is None:
@@ -714,31 +870,38 @@ def main():
             continue
 
         decls = None
+        file_engine = "regex"
         if engine == "ast-grep-py":
             try:
                 decls = extract_decls_ast(ag, text, lang)
+                file_engine = "ast-grep-py"
             except BaseException as e:   # ast-grep-py 在未知语言上会 panic，必须兜住
                 _warn(f"AST 解析失败（{lang}）：{type(e).__name__}；该文件降级为正则")
                 decls = None
         elif engine == "ast-grep-cli":
             try:
                 decls = extract_decls_cli(text, lang, path)
+                file_engine = "ast-grep-cli"
             except BaseException as e:
                 _warn(f"CLI 解析失败（{lang}）：{type(e).__name__}；该文件降级为正则")
                 decls = None
         if decls is None:
             decls = extract_decls_regex(text, lang)
+            file_engine = "regex"
+        degraded_files += (file_engine == "regex" and engine != "regex")
 
         try:
             for f in check_names(decls, path, lang):
                 f["file"] = path
-                f["engine"] = engine if lang in AST_DECL_SPECS and engine != "regex" else "regex"
+                # 逐文件标注实际生效的引擎：降级过的文件必须写 regex，不能沿用全局引擎名
+                f["engine"] = file_engine
                 all_findings.append(f)
         except Exception as e:
             _warn(f"单名检查失败 {path}: {e}")
 
         for line, nm, kind, scope in decls:
             records.append((path, line, nm, kind, scope, lang))
+        file_engines[path] = file_engine
 
     if unsupported:
         _warn(f"{unsupported} 个文件扩展名不受支持，已跳过（不会静默通过）")
@@ -746,11 +909,17 @@ def main():
         _warn(f"未扫描到任何受支持的文件：{args.path}（支持：{', '.join(sorted(EXT_LANG))}）")
 
     if not args.no_repo:
+        repo_findings = []
         if args.near_name:
-            all_findings.extend(repo_near_names(records))
+            repo_findings.extend(repo_near_names(records))
         if args.synonyms:
-            all_findings.extend(repo_synonym_drift(records))
-        all_findings.extend(repo_cross_kind(records))
+            repo_findings.extend(repo_synonym_drift(records))
+        repo_findings.extend(repo_cross_kind(records))
+        # 仓库级聚合跨文件比较，本身不属于某一引擎；但每条 finding 仍归属到具体文件，
+        # 用该文件实际生效的引擎标注，保持"逐 finding 可归因"的契约。
+        for f in repo_findings:
+            f.setdefault("engine", file_engines.get(f.get("file"), "regex"))
+        all_findings.extend(repo_findings)
 
     rename_summary = None
     if args.rename:
@@ -777,6 +946,7 @@ def main():
         payload = dict(files_scanned=files_scanned,
                        counts=dict(counts),
                        engine=engine,
+                       degraded_files=degraded_files,
                        findings=all_findings)
         if rename_summary is not None:
             payload["rename"] = rename_summary
@@ -786,6 +956,10 @@ def main():
                      f"问题 Critical={counts['Critical']} Major={counts['Major']} Minor={counts['Minor']}")
         if engine == "regex":
             lines.append("⚠ 正则兜底：可能漏检一行多类型声明与复杂签名；建议 pip install ast-grep-py")
+        elif degraded_files:
+            # 全局引擎名会让人以为整批都是 AST 结果；这里点明有多少文件实际走了正则
+            lines.append(f"⚠ {degraded_files}/{files_scanned} 个文件降级为正则（见上方 [warn]）；"
+                         f"这些文件的 findings 标 engine=regex")
         lines.append("-" * 72)
         cur = None
         for f in all_findings:

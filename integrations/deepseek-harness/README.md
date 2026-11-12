@@ -28,7 +28,7 @@ dsh plugin --profile <profile> add "<本仓库>/integrations/deepseek-harness"
 | 项 | 值 |
 |---|---|
 | 包名 | `dsh-kit` |
-| 版本 | 6.2.0 |
+| 版本 | 6.2.1 |
 | 技能 | 95（11 包内自有 + 84 上游合并） |
 | 上游 | `affaan-m/ECC` 59；`mattpocock/skills` 19；`thedotmack/claude-mem` 6；`alibaba/open-code-review` 0 |
 | 参考文件 | `rules/`（2）、`references/`（grow-dream 类型定义 1 + 上游来源登记 5） |
@@ -62,4 +62,4 @@ node tools/validate-package.ts
 
 见 `references/upstream-sources.md`（索引）与 `upstream-ecc.md`、`upstream-mp-skills.md`、`upstream-claude-mem.md`、`upstream-ocr.md`。
 
-> 版本:6.2.0 | 技能:95 | 上游:ECC/mattpocock/claude-mem（+ open-code-review 仅参考资料）
+> 版本:6.2.1 | 技能:95 | 上游:ECC/mattpocock/claude-mem（+ open-code-review 仅参考资料）
