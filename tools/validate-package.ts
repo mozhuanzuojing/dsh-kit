@@ -23,6 +23,9 @@
  *     子键在 ⑩ 里完全不可见 ⇒ 这一项专门把它显示出来，而不是让它被读成"一个都没有"）
  * 12) **frontmatter 标量语法**（计入退出码）：本包全部用单行标量 ⇒ `key: "…"` 必须引号配对、内部 `"` 必须转义、
  *     `\` 后必须是合法转义；块标量（`>` / `|`）本门不支持 ⇒ 直接报错，不让它静默通过
+ * 13) **版本一致性**（计入退出码）：本仓有两套 `package.json`（仓根 `dsh-kit-repo` 仅占位、包内 `dsh-kit` 才是发布体），
+ *     二者 `version` 必须相等；两份 README 的版本行（各一份表格 + 包 README 页脚）必须与之一致。
+ *     为什么要有它：版本号靠手改，v6.2.0 → 6.2.1 曾手动同步 4 处，而旧门不校验版本 ⇒ 只改一处照样全绿。
  *
  * ## 明确**不覆盖**（先读这段，别据此宣称"门管了"）
  *  · 上游正文的字节级保真（本仓不含上游快照）、`description` 的措辞质量、"是否真有一句英文"；
@@ -328,6 +331,85 @@ for (const d of dirs) {
     if (!existsSync(resolve(join(SKILLS, d), path))) problems.push(`正文相对路径不存在: ${d} -> ${path}`);
   }
 }
+
+// ⑭ **版本一致性**（v6.2.1 新增）：仓根 package.json 与包内 package.json 的 version 必须相等；
+// 两份 README 的版本行（表格 + 包 README 页脚）必须与之一致。版本号靠手改 ⇒ 旧门不校验就等于没有守卫。
+// 判据只认「读出来的字符串相等」：不比较语义化排序，不猜哪个是权威 —— 不一致就报，让人去对齐。
+const VERSION_RE = /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/;
+
+function readPkgVersion(rel: string, label: string): string | undefined {
+  let raw: string;
+  try {
+    raw = readFileSync(join(HERE, "..", rel), "utf8");
+  } catch (e) {
+    problems.push(`版本门：无法读取 ${rel}（${label}）—— ${(e as Error).message}`);
+    return undefined;
+  }
+  let version: unknown;
+  try {
+    version = JSON.parse(raw).version;
+  } catch (e) {
+    problems.push(`版本门：${rel} 不是合法 JSON —— ${(e as Error).message}`);
+    return undefined;
+  }
+  if (typeof version !== "string" || !VERSION_RE.test(version)) {
+    problems.push(`版本门：${rel} 的 version 缺失或格式非法 —— ${String(version)}`);
+    return undefined;
+  }
+  return version;
+}
+
+/** 从 README 里取版本行；`where` 只用于报错措辞（表格 / 页脚）。 */
+function readDocVersion(rel: string, re: RegExp, where: string): string | undefined {
+  let raw: string;
+  try {
+    raw = readFileSync(join(HERE, "..", rel), "utf8");
+  } catch (e) {
+    problems.push(`版本门：无法读取 ${rel} —— ${(e as Error).message}`);
+    return undefined;
+  }
+  const m = re.exec(raw);
+  if (!m) {
+    problems.push(`版本门：${rel} 找不到${where}版本行`);
+    return undefined;
+  }
+  return m[1].trim();
+}
+
+const rootVer = readPkgVersion("package.json", "仓根 dsh-kit-repo");
+const pkgVer = readPkgVersion("integrations/deepseek-harness/package.json", "包 dsh-kit");
+if (rootVer !== undefined && pkgVer !== undefined && rootVer !== pkgVer) {
+  problems.push(`版本门：两处 package.json 版本不一致 —— 仓根=${rootVer} / 包=${pkgVer}`);
+}
+// 以**包内** package.json 为参照（它才是发布体；仓根只是占位）。包内读不到时才退回仓根。
+const canonicalVer = pkgVer ?? rootVer;
+// 显式带 label：两份 README 的 basename 都叫 README.md，只打印文件名会让「哪一份出错」不可辨。
+const DOC_VERSION_SOURCES: Array<[label: string, rel: string, re: RegExp, where: string]> = [
+  ["根 README", "README.md", /\|\s*版本\s*\|\s*\*\*([^*|\n]+?)\*\*\s*\|/, "表格"],
+  ["包 README", "integrations/deepseek-harness/README.md", /\|\s*版本\s*\|\s*([^|*\n]+?)\s*\|/, "表格"],
+  ["包 README", "integrations/deepseek-harness/README.md", />\s*版本:([^\s|\n]+)/, "页脚"],
+];
+const docVers: Array<[string, string, string | undefined]> = [];
+if (canonicalVer !== undefined) {
+  for (const [label, rel, re, where] of DOC_VERSION_SOURCES) {
+    const got = readDocVersion(rel, re, where);
+    docVers.push([label, where, got]);
+    if (got !== undefined && got !== canonicalVer) {
+      problems.push(`版本门：${rel} 的${where}版本与 package.json 不一致 —— ${got} / ${canonicalVer}`);
+    }
+  }
+}
+const versionOk =
+  rootVer !== undefined &&
+  pkgVer !== undefined &&
+  rootVer === pkgVer &&
+  docVers.length === DOC_VERSION_SOURCES.length &&
+  docVers.every(([, , v]) => v === canonicalVer);
+console.log(
+  `⑭ 版本一致性：仓根=${rootVer ?? "?"} / 包=${pkgVer ?? "?"} / ` +
+    docVers.map(([label, where, v]) => `${label}(${where})=${v ?? "?"}`).join(" · ") +
+    (versionOk ? " ✅" : " ❌"),
+);
 
 // ⑥-补 **白名单腐化计违规**（v6.0.6 修复轮）：豁免表只会单向增长 —— 「文件已无 CJK 却仍挂着豁免」
 // 说明它该撤了。旧版只打一行 ⚠、**不进 `problems`** ⇒ 这条可以永远绿着（本仓在别处用「白名单腐化即违规」

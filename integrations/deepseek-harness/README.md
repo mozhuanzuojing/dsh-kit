@@ -54,7 +54,7 @@ dsh plugin --profile <profile> list --depth 0
 node tools/validate-package.ts
 ```
 
-它校验：技能数 = 95、一层拍平、无 legacy 键、`name`/`description` 必填且 `name` == 目录名、**`description` 英中双语**、**正文不含 CJK**（上游自带中文的只有带理由的显式豁免）、8 个用户调用型名单、84 个上游技能的 `metadata` 三元组、以及**正文内包内相对路径无死链**；退出码非 0 即有问题。
+它校验：技能数 = 95、一层拍平、无 legacy 键、`name`/`description` 必填且 `name` == 目录名、**`description` 英中双语**、**正文不含 CJK**（上游自带中文的只有带理由的显式豁免）、8 个用户调用型名单、84 个上游技能的 `metadata` 三元组、**正文内包内相对路径无死链**、以及**版本一致性**（两处 `package.json` 的 `version` 相等，两份 README 的版本行与之一致）；退出码非 0 即有问题。
 **不覆盖**：上游正文的字节级保真（需上游快照）、`description` 的质量（含"是否真有一句英文"——`description` 判据只证明出现了拉丁字母）、技能行为正确性。
 （`tools/` 未列入本包 `files`：它是维护者/CI 用的仓内工具，装成 npm 包的消费方拿到也改不了包本身。若希望随包分发，需把它移入本包目录并加进 `files`。）
 

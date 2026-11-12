@@ -173,7 +173,7 @@ dsh-kit/
 node tools/validate-package.ts
 ```
 
-它检查：技能数 = 95、只有 `skills/<name>/SKILL.md` 一层、无 legacy 键、`name`/`description` 必填且 `name` 与目录名一致、**`description` 英中双语**（须同时含拉丁字母与 CJK）、**SKILL.md 正文不含 CJK**（上游正文自带中文的只有 `LANGUAGE_ALLOWED` 里**带理由**的显式豁免，逐条打印，含"白名单已腐化"提示）、D8 的 8 个用户调用型名单完全一致（多一个少一个都算失败）、84 个上游技能的 `metadata` 三元组与引用总表一致、正文内包内相对路径**无死链**；嵌套载荷必须恰为 grow-dream 那 1 个。退出码非 0 即有问题（未认可的上游杂键只报告、不计入失败，因为 DSH 会静默忽略它们）。
+它检查：技能数 = 95、只有 `skills/<name>/SKILL.md` 一层、无 legacy 键、`name`/`description` 必填且 `name` 与目录名一致、**`description` 英中双语**（须同时含拉丁字母与 CJK）、**SKILL.md 正文不含 CJK**（上游正文自带中文的只有 `LANGUAGE_ALLOWED` 里**带理由**的显式豁免，逐条打印，含"白名单已腐化"提示）、D8 的 8 个用户调用型名单完全一致（多一个少一个都算失败）、84 个上游技能的 `metadata` 三元组与引用总表一致、正文内包内相对路径**无死链**、**版本一致性**（仓根 `package.json` 与包内 `package.json` 的 `version` 必须相等，根 README 表格、包 README 表格与页脚须与之一致）；嵌套载荷必须恰为 grow-dream 那 1 个。退出码非 0 即有问题（未认可的上游杂键只报告、不计入失败，因为 DSH 会静默忽略它们）。
 
 **不覆盖**：上游正文的字节级保真（需要上游快照，本仓不含）、`description` 的措辞质量（含"**是否真有一句英文**"——判据 ⑤ 只证明出现了拉丁字母，中文描述里提到一个拉丁术语同样会过）、技能行为正确性。
 
