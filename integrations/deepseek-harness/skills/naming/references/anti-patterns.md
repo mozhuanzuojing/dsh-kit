@@ -1,16 +1,19 @@
 # 反模式：什么会毁掉一个名字
 
+> 机器化体检：`python scripts/check-brand-slop.py <name...>` 会把下面可判定的模式扫一遍（提示器，命中≠否决）。
+> 配额**不在这里重复**：唯一权威是 `ai-era.md` §1「后缀配额超限」一行（改配额只改那一处）。本文件只负责"哪些模式算 slop"。
+
 ## A. 产品命名 — AI 味与五宗罪
 
 ### AI Name Slop（AI 生成味的红旗）
 | 模式 | 例子 | 为何死 |
 |---|---|---|
-| 后缀成瘾 | Glidely, Parsify, Chatible, Syncora | 所有 AI 都用 -ly/-ify/-able/-ora，千篇一律 |
+| 后缀成瘾 | Glidely, Parsify, Chatible, Syncora | 历史性套路：AI 与生成器都爱这些后缀。**数据要分开看**：`-ly/-ify` 这类生造后缀在真实创业公司里**在减少**（2.6%→1.4%）；但 `-io` 仍是当前**数量最多**的后缀之一（YC 快照里排第 4，仅次 `-ai`/`-labs`）；真正在涨的是 `-ai`（7.5%）与 `-labs`（见 `ai-era.md` §1） |
 | 无意义混拼 | Brightrix, Nexagen, Vaultora | 技术唯一但彼此可互换，无故事无意象 |
 | 同义词库抽取 | Apex, Pinnacle, Summit, Zenith | 被用烂，同义词库不是命名工具 |
 | 类别+修饰 | CloudGuard, DataSync, SiteWatch | 描述但不可记 |
 | 空洞企业词 | X Solutions / Labs / Platform / HQ | 什么也没说 |
-| 过度拼写错误 | 去所有元音、K 替 C | 2010 年短暂有效，现只表示"真名被占" |
+| 过度拼写错误 | 去所有元音、K 替 C、4 连辅音 | 2010 年短暂有效，现只表示"真名被占"或"读不出" |
 | 假拉丁/希腊 | Cognivex, Synaptiq, Quantera | 唬人 2 秒，毫无意义 |
 | 空洞形容词 | BrightPath, TrueNorth, ClearView | 任何品类都能用 |
 

@@ -1,6 +1,6 @@
 {
   "name": "dsh-kit",
-  "version": "6.1.0",
+  "version": "6.2.0",
   "description": "dsh-kit 技能包(DSH bundle 形态):95 个技能(11 个包内自有 + 84 个上游合并),包内隔离加载,不写入 canonical 技能目录",
   "license": "MIT",
   "type": "module",

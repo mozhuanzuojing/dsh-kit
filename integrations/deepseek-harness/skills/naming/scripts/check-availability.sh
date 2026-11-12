@@ -14,7 +14,26 @@ shift || true
 PLATFORMS="${*:-domain npm github pypi}"
 
 have() { command -v "$1" >/dev/null 2>&1; }
-http_code() { curl -s -o /dev/null -w "%{http_code}" --max-time 12 "$1" 2>/dev/null || echo "ERR"; }
+# 注意：curl 在连接失败时仍会打印 "000"，旧写法 `|| echo ERR` 会拼成 "000ERR"（已修）。
+http_code() {
+  local c
+  c="$(curl -s -o /dev/null -w '%{http_code}' --max-time 12 "$1" 2>/dev/null)"
+  case "$c" in
+    ''|000|ERR) echo "ERR" ;;
+    *) echo "$c" ;;
+  esac
+}
+
+# RDAP 优先：404 = 未注册，200 = 已注册；比 whois 快且无速率陷阱
+rdap_status() {
+  local code
+  code="$(http_code "https://rdap.org/domain/$1")"
+  case "$code" in
+    404) echo "available" ;;
+    200) echo "registered" ;;
+    *)   echo "unknown" ;;
+  esac
+}
 
 hr() { printf '%s\n' "------------------------------------------------------------"; }
 echo "命名可用性核验: $NAME"
@@ -26,22 +45,22 @@ for p in $PLATFORMS; do
     domain)
       for tld in com dev io app co; do
         d="$NAME.$tld"
-        if have whois; then
+        st="$(rdap_status "$d")"
+        if [ "$st" = "available" ]; then
+          echo "  domain   $d : 可能可用 (RDAP 404)"
+        elif [ "$st" = "registered" ]; then
+          echo "  domain   $d : 已注册 (RDAP 200)"
+        elif have whois; then
           out="$(whois "$d" 2>/dev/null || true)"
           if echo "$out" | grep -qiE "no match|not found|no data found|available|no entries found"; then
             echo "  domain   $d : 可能可用 (whois)"
           elif [ -n "$out" ]; then
             echo "  domain   $d : 疑似已注册 (whois)"
           else
-            echo "  domain   $d : whois 无响应，跳过"
+            echo "  domain   $d : RDAP/whois 均无响应，跳过"
           fi
         else
-          code="$(http_code "https://$d")"
-          if [ "$code" = "000" ] || [ "$code" = "ERR" ]; then
-            echo "  domain   $d : 无站点响应（不代表未注册，仅提示）"
-          else
-            echo "  domain   $d : HTTP $code（可能已有站点）"
-          fi
+          echo "  domain   $d : RDAP 无结论且无 whois（不代表可用）"
         fi
       done
       ;;

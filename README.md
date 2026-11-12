@@ -5,7 +5,7 @@ DeepSeek Harness **bundle 形式**的技能包：**95 个技能**（11 个包内
 | 项 | 值 |
 |---|---|
 | 包位置 | `integrations/deepseek-harness/`（包名 **`dsh-kit`**） |
-| 版本 | **6.0.7** |
+| 版本 | **6.2.0** |
 | 技能 | **95** = 11 个包内自有 + 84 个上游合并（`affaan-m/ECC` 59 / `mattpocock/skills` 19 / `thedotmack/claude-mem` 6 / `alibaba/open-code-review` 0） |
 | 随包参考 | `rules/`（WSL CLI 工具链、代理管理）、`references/`（grow-dream 类型定义 + 上游来源登记） |
 | 上游来源登记 | `references/upstream-sources.md` 与四份分册（论文引用格式：作者/载体/快照 SHA/许可/URL/取用范围/**引用键**） |
@@ -33,18 +33,44 @@ dsh plugin --profile <profile> list --depth 0
 dsh plugin --profile <profile> remove dsh-kit
 ```
 
+## v6.2.0 变更（naming 技能深度化 + 校验门转绿）
+
+**校验门首次全绿**：`node tools/validate-package.ts` → exit 0（此前 v6.1.0 遗留 4 项红）。
+
+### naming 技能（22 个参考文件 + 14 个脚本）
+
+- **产品侧**：类型选型、竞品命名占位图、否决门（SCRATCH）+ 0–3 锚点评分、分级可用性（L1 / L1.5 / L2 / L3）、语音象征三层、中文音形义、跨语言、代号、品牌架构、tagline、开源命名。
+- **AI 时代**：生成端失效模式（分布坍缩 / 后缀配额 / temperature 误区）、L1.5 生成式可提及性（只报提及率 + n，禁止排名）、AI 朗读门、零记忆冷启动。
+- **代码侧**：语言层规则 + 跨层（API / DB / 事件 / 指标 / 配置）三宗陷阱 + UI 层（按钮 / aria / 令牌 / i18n / 空态）。
+- **6 个检查器 + 63 个回归用例**：
+  | 脚本 | 用途 | 用例 |
+  |---|---|---|
+  | `check-code-names.py` | 代码标识符（三层引擎：ast-grep-py → CLI → 正则） | 14 × 2 |
+  | `check-cross-layer.py` | 跨层一致性（init / check / audit） | 10 |
+  | `check-ui-names.py` | UI 文案 / aria / 令牌 / i18n | 11 |
+  | `check-brand-slop.py` | 品牌 AI 味（非拉丁名显式"未检查"） | 12 |
+  | `check-ai-visibility.py` | L1.5 采集与统计 | 8 |
+  | `run-all-tests.py` | 一键回归 | 63 合计 |
+- **证据台账**：所有结论带强度标注（实证 / 机构 / 经验 / 判断 / 未验证），并列出「不要重复的伪结论」。
+- **依赖**：`python3 >= 3.6`，零第三方依赖；`ast-grep-py` 可选（不装则降级为纯标准库正则）。脚本共享 `scripts/_common.py`，拷走需整个 `scripts/`。
+
+### 两个此前"红"的技能补全
+
+`ssrf-remediation`、`dsh-remote-wsl-troubleshooting` 的正文已英文化并补 `metadata.origin: dsh-kit`，二者加入 `tools/validate-package.ts` 的 `NATIVE` 名单（现 11 个包内自有）。
+
 ## 技能清单
 
-完整逐条清单（含上游路径与处置）见 [`integrations/deepseek-harness/references/upstream-sources.md`](integrations/deepseek-harness/references/upstream-sources.md) 与四份分册。这里按来源分组列出全部 92 个：
+完整逐条清单（含上游路径与处置）见 [`integrations/deepseek-harness/references/upstream-sources.md`](integrations/deepseek-harness/references/upstream-sources.md) 与四份分册。这里按来源分组列出全部 95 个：
 
-> **计数口径**：**92** 指 DSH 会发现的一层技能（`skills/<name>/SKILL.md`）。用 `**/SKILL.md` 递归计数会得到 **93**——多出的 1 个是 `skills/grow-dream/templates/w-ocean/skills/w-ocean-agent/SKILL.md`（grow-dream 的技能载荷模板，DSH 不发现、不计入技能面）。
+> **计数口径**：**95** 指 DSH 会发现的一层技能（`skills/<name>/SKILL.md`）。用 `**/SKILL.md` 递归计数会得到 **96**——多出的 1 个是 `skills/grow-dream/templates/w-ocean/skills/w-ocean-agent/SKILL.md`（grow-dream 的技能载荷模板，DSH 不发现、不计入技能面）。
 
-### 包内自有（8）
+### 包内自有（11）
 
 |  |  |  |  |
 |---|---|---|---|
 | `chrome-devtools-wsl` | `dsh-kit` | `grow-dream` | `karpathy-guidelines` |
 | `write-a-skill` | `wsl-network` | `github-repo` | `diagnose` |
+| `naming` | `ssrf-remediation` | `dsh-remote-wsl-troubleshooting` |  |
 
 ### 上游合并 · `affaan-m/ECC`（59）
 

@@ -48,7 +48,7 @@ const LEGACY = new Set(["disableModelInvocation", "modelInvocable", "userInvocab
 const USER_INVOKED = ["grill-me", "grill-with-docs", "handoff", "improve-codebase-architecture", "retro", "triage", "to-spec", "to-tickets"];
 
 /** Native (in-house) skills: no upstream source; metadata may be only origin: dsh-kit. */
-const NATIVE = ["chrome-devtools-wsl", "diagnose", "dsh-kit", "github-repo", "grow-dream", "karpathy-guidelines", "naming", "write-a-skill", "wsl-network"];
+const NATIVE = ["chrome-devtools-wsl", "diagnose", "dsh-kit", "github-repo", "grow-dream", "karpathy-guidelines", "naming", "write-a-skill", "wsl-network", "dsh-remote-wsl-troubleshooting", "ssrf-remediation"];
 
 /** 上游 metadata 三元组，与 references/upstream-sources.md 的引用总表一一对应。 */
 const ORIGINS = new Map<string, [upstream: string, snapshot: string]>([

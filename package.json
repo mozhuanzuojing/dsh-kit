@@ -2,5 +2,6 @@
   "name": "dsh-kit-repo",
   "private": true,
   "type": "module",
-  "description": "仓根标记：本仓的包在 integrations/deepseek-harness/（npm 包名 dsh-kit）。此处只为让仓内 .ts 工具（tools/validate-package.ts）以 ESM 解析、消除 MODULE_TYPELESS_PACKAGE_JSON 警告；不发布、不承载依赖。"
+  "description": "仓根标记：本仓的包在 integrations/deepseek-harness/（npm 包名 dsh-kit）。此处只为让仓内 .ts 工具（tools/validate-package.ts）以 ESM 解析、消除 MODULE_TYPELESS_PACKAGE_JSON 警告；不发布、不承载依赖。",
+  "version": "6.2.0"
 }

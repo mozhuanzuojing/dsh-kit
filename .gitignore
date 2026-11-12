@@ -15,5 +15,9 @@ node_modules/
 .venv/
 uv.lock
 
+# Python 字节码（skills/*/scripts 下的自测脚本会 import 本地模块并生成）
+__pycache__/
+*.pyc
+
 # 本地环境变量（模板见 integrations/deepseek-harness/skills/chrome-devtools-wsl/.env.example）
 .env

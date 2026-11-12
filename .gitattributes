@@ -1,0 +1,8 @@
+# 行尾纪律：scripts/ 下的可执行脚本必须是 LF。
+# 本机 core.autocrlf=true 时，checkout 会把 .sh/.py 转成 CRLF，
+# 导致 `bash: set: pipefail: invalid option name` 这类**看起来像语法错误**的故障。
+# 这里只声明规则，不改写历史；需要重整时跑 `git add --renormalize .`。
+*.sh   text eol=lf
+*.py   text eol=lf
+*.ts   text eol=lf
+*.mjs  text eol=lf

@@ -70,12 +70,34 @@
 ## 10. 一致性 / 词表 / 近名
 - 维护 **glossary**：一个概念一个词；同义归一（save/store/put → 选一个；fetch/retrieve → fetch）
 - 检测**近名冲突**：同名异义（`db`/`conn`）、近名异义（`clazz`/`clz`、`agentName`/`agentNames`）；语义不同必须区分，语义相同必须统一
+- **可机器化的部分交给脚本**：`python scripts/check-code-names.py <path>` 会出 repo 级 `near_name`（大小写/编辑距离≤1/单复数/容器后缀），加 `--synonyms` 再出 `synonym_drift`（同义动词混用 + 本仓库主流用法）。两类都是**启发式 Minor 提示**，语义仍由 glossary 定夺（判断）
 - 测试命名：`test_<行为>__<场景>`（双下划线），祈使句，不用 should/expect/it
+
+## 10.1 重命名（blast radius）
+改名前先分级，再动手（`python scripts/check-code-names.py <path> --rename OLD=NEW` 给出三个计数）：
+
+| 档 | 典型位置 | 处理 |
+|---|---|---|
+| **auto** 可自动改 | 声明行 + 同文件引用（有编译器/LSP 保证） | IDE rename / codemod |
+| **manual** 需人工确认 | 注释、文档、日志文案、测试名、跨语言调用 | 逐处判断是否属于同义 |
+| **risky** 不要动 | 字符串字面量、序列化键、DB 列名、事件名、HTTP 路由、配置键 | 改名即破坏契约；要改走迁移（别名/双写/版本化） |
+
+判定顺序：**先看是不是契约（risky 优先），再看是不是注释，最后才当普通引用**。脚本只做文本级分类，跨文件语义改名请用 IDE/LSP（判断）。
+
+**改名的执行顺序**（涉及 risky 档时必须走这三步，见 `api-naming.md` §5.5）：**expand（新旧并存）→ migrate（监控旧名调用量归零）→ contract（删除旧名，字段号/枚举值 reserved）**。expand 可无损回滚，contract 不可回滚 —— 所以 contract 单独一次发布并留观察窗口。判据是"旧名调用量为 0"，不是"代码改完了"。
 
 ## 11. 上下文重复 / 冗余
 - `class MenuItem { handleClick }` 而非 `handleMenuItemClick`（去掉重复语境）
 - `Car { make }` 而非 `carMake`
 - 不要冗余类型：`userObject`→`user`、`dataList`→`items`
+
+## 11.1 跨层命名（API / DB / 事件 / 指标 / 配置）
+
+语言层对了不代表跨层对。同一个概念在五层里的名字常常**不能机械转换**（`is_` 前缀在 AIP 与 GitLab 指南里方向相反、`create_time` vs `created_at`、Prometheus 要 `_total` 而 OTel 明文不要）。做法与三宗陷阱见 `api-naming.md`：维护一张「跨层概念表」，新概念先入表再写代码。
+
+## 11.2 UI 层（界面文案 / CSS / 组件 / aria / i18n）
+
+代码标识符对了，界面上的名字仍可能错。按钮、空态、错误提示、CSS 类、设计令牌、组件名、路由、`aria-label`、i18n key 的规则见 `ui-naming.md`。三条最常犯的：危险操作不写后果（`删除` vs `永久删除 3 个文件`）、设计令牌用外观名（`--color-red` 而非 `--color-danger`）、图标按钮没有含对象的 `aria-label`。
 
 ## 12. 快速自检
 能否发音？同词是否一致？可搜索（无裸魔术数）？无 mental mapping（`location` 非 `l`）？无 flag 参数？无语境重复？加/删一个词意思变不变（不变=填充词）？
