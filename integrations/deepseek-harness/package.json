@@ -27,7 +27,8 @@
     "dsh-kit"
   ],
   "engines": {
-    "node": ">=22.18"
+    "node": ">=22.18",
+    "dsh": ">=0.2.2-rc.2"
   },
   "dsh": {
     "bundle": {

@@ -36,6 +36,7 @@ dsh plugin --profile <profile> add "<本仓库>/integrations/deepseek-harness"
 | frontmatter 认可键 | `name`、`description`、`metadata`、`disable-model-invocation`、`user-invocable`（未认可的上游杂键被静默忽略；legacy 键会让该技能被 DSH 整体丢弃，只留一条 warn 日志） |
 | 运行期依赖 | `@deepseek-ai/dsh-skill-filesystem` 由 **DSH 宿主自带**，本包**故意不声明**为 dependency/peerDependency：声明会让 pnpm 在 profile 里再装一份副本，产生第二个模块实例，而该服务靠模块级标识工作。宿主版本要求见其 `Config` 三键（`providerName` / `includeDefaultRoots` / `bundledSkillDir`） |
 | Node | 包本身无运行期代码；唯一可执行载荷 `skills/standup/standup.ts` 需 Node ≥22.18（原生 type-stripping） |
+| DSH | ≥ 0.2.2-rc.2（宿主按 `engines.dsh` 校验兼容门；低于此版本会被拒绝加载） |
 | 许可 | `LICENSE`（包内 MIT）+ `LICENSES/`（上游许可正文）+ `THIRD-PARTY-NOTICES.md`（第三方声明与变更声明） |
 
 ## 校验
